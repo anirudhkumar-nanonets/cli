@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/safeurl"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -207,6 +208,16 @@ func runDownload(opts *DownloadOptions) error {
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}
+	}
+
+	opts.IO.StopProgressIndicator()
+	if opts.IO.IsStdoutTTY() {
+		destination := opts.DestinationDir
+		if destination == "" {
+			destination = "."
+		}
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Downloaded %s to %s\n", cs.SuccessIcon(), text.Pluralize(len(selected), "artifact"), destination)
 	}
 
 	return nil

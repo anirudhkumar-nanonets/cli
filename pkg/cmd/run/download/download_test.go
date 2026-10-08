@@ -823,6 +823,74 @@ func Test_runDownload(t *testing.T) {
 	}
 }
 
+func Test_runDownload_TTYSummary(t *testing.T) {
+	artifact := func(name string) testArtifact {
+		return testArtifact{
+			artifact: shared.Artifact{
+				Name:        name,
+				DownloadURL: "http://download.com/" + name + ".zip",
+			},
+			files: []string{name + "-file"},
+		}
+	}
+
+	tests := []struct {
+		name       string
+		names      []string
+		isTTY      bool
+		wantStdout string
+	}{
+		{
+			name:       "tty reports multiple artifacts and destination",
+			isTTY:      true,
+			wantStdout: "✓ Downloaded 2 artifacts to %s\n",
+		},
+		{
+			name:       "tty reports single artifact",
+			names:      []string{"artifact-1"},
+			isTTY:      true,
+			wantStdout: "✓ Downloaded 1 artifact to %s\n",
+		},
+		{
+			name:       "non-tty prints nothing",
+			isTTY:      false,
+			wantStdout: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+
+			destination := t.TempDir()
+			opts := &DownloadOptions{
+				IO:             ios,
+				RunID:          "2345",
+				DestinationDir: destination,
+				Names:          tt.names,
+				Prompter:       prompter.NewMockPrompter(t),
+				Platform: &fakePlatform{
+					runs: []run{
+						{
+							id:            "2345",
+							testArtifacts: []testArtifact{artifact("artifact-1"), artifact("artifact-2")},
+						},
+					},
+				},
+			}
+
+			require.NoError(t, runDownload(opts))
+
+			wantStdout := tt.wantStdout
+			if wantStdout != "" {
+				wantStdout = fmt.Sprintf(wantStdout, destination)
+			}
+			assert.Equal(t, wantStdout, stdout.String())
+			assert.Equal(t, "", stderr.String())
+		})
+	}
+}
+
 func countFilesInDirRecursively(t *testing.T, dir string) int {
 	t.Helper()
 
