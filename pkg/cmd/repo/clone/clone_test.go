@@ -509,6 +509,68 @@ func Test_RepoClone_noParent_noUpstream(t *testing.T) {
 	}
 }
 
+func Test_RepoClone_successMessage(t *testing.T) {
+	tests := []struct {
+		name       string
+		isTTY      bool
+		wantStderr string
+	}{
+		{
+			name:       "tty",
+			isTTY:      true,
+			wantStderr: "✓ Cloned OWNER/REPO to REPO\n",
+		},
+		{
+			name:       "non-tty",
+			isTTY:      false,
+			wantStderr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.GraphQL(`query RepositoryInfo\b`),
+				httpmock.StringResponse(`
+					{ "data": { "repository": {
+						"name": "REPO",
+						"owner": {
+							"login": "OWNER"
+						}
+					} } }
+					`))
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+			cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+
+			err := cloneRun(&CloneOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (gh.Config, error) {
+					return config.NewMockConfig(), nil
+				},
+				GitClient: &git.Client{
+					GhPath:  "some/path/gh",
+					GitPath: "some/path/git",
+				},
+				IO:         ios,
+				Repository: "OWNER/REPO",
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
+}
+
 func TestSimplifyURL(t *testing.T) {
 	tests := []struct {
 		name        string

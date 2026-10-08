@@ -195,6 +195,11 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.ErrOut, "%s Cloned %s to %s\n", cs.SuccessIcon(), ghrepo.FullName(canonicalRepo), cloneDir)
+	}
+
 	// If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
 	if canonicalRepo.Parent != nil {
 		gc := gitClient.Copy()
